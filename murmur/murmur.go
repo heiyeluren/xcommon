@@ -1,4 +1,4 @@
-package common
+package xcommon
 
 // Copyright 2013, Sébastien Paolacci. All rights reserved.
 // Use of this source code is governed by a BSD-style
