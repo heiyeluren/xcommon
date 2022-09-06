@@ -1,4 +1,4 @@
-package common
+package xcommon
 
 import (
 	"fmt"
