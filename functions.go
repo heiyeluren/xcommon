@@ -1,4 +1,4 @@
-package common
+package xcommon
 
 import (
 	"github.com/spf13/cast"
