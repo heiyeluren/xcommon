@@ -1,4 +1,4 @@
-package common
+package xcommon
 
 // 1、所有配置加载到内存，
 // 2、并推送到所有模块
