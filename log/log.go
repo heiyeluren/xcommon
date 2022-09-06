@@ -3,15 +3,16 @@
  * @package: main
  * @author: heiyeluren
  * @desc: Log operate file
- * @date: 2013/6/24
  * @history:
  *     2013/6/24 created file
  *     2013/7/1  add logid function
  *     2013/7/2  update code structure
  *     2013/7/4  refactor all code
  *     2013/7/10 add log_level operate
+ * 	   2021/6/10 fixed bug, add LogInit() api
+ *     2022/9/6  update logInit() api
  */
-package common
+package xcommon
 
 import (
 	"errors"
@@ -25,43 +26,95 @@ import (
 	"sync"
 	"time"
 
-	config "xcache/common/config"
+	config "github.com/heiyeluren/xcommon/config"
 )
 
 /*
 
 配置文件格式：
 =================================================
+
+[log]
+
 #日志文件位置 (例：/var/log/koala.log)
 log_notice_file_path    = log/koala.log
-log_debug_file_path = log/koala.log
-log_trace_file_path = log/koala.log
-log_fatal_file_path = log/koala.log.wf
+log_debug_file_path 	= log/koala.log
+log_trace_file_path 	= log/koala.log
+log_fatal_file_path 	= log/koala.log.wf
 log_warning_file_path   = log/koala.log.wf
 
 #日志文件切割周期（1天:day; 1小时:hour; 10分钟:ten）
-log_cron_time = day
+log_cron_time 			= day
 
 #日志chan队列的buffer长度，建议不要少于1024，#不建议多于102400，最长：2147483648
-log_chan_buff_size = 20480
+log_chan_buff_size 		= 20480
 
 #日志刷盘的间隔时间，单位:毫秒，建议500~5000毫秒(0.5s-5s)，建议不超过30秒
-log_flush_timer = 1000
+log_flush_timer 		= 1000
+
 =================================================
 
 代码调用示例：
 
-import "github.com/heiyeluren/koala/utility/logger"
-import "github.com/heiyeluren/koala/utility/network"
+//--------- 配置文件调用 -----------
+import (
+	log "github.com/heiyeluren/xcommon/log"
+)
 
-logid := request.Header("WD_REQUEST_ID") //注意:只有问答产品才有WD_REQUEST_ID这个数据，其他服务按照对应id来
-log = logger.NewLogger(logid)    //注意: 一个请求只能New一次，logid可以传空字符串，则会内部自己生成logid
+//初始化日志配置
+logConfFile := "../../conf/conf.ini"
+config.ParseConfPath(logConfFile)
+
+//生成日志ID打印日志
+logid := request.Header("REQUEST_ID") //注意:自行定义REQUEST_ID这个数据，其他服务按照对应id来，这种适合链路跟踪里上层的ID
+l = log.NewLogger(logid)    //注意: 一个请求只能New一次，logid可以传空字符串，则会内部自己生成logid
 
 log_notice_msg := "[clientip=202.106.51.6 errno=0 errmsg=ok request_time=100ms]"
-log.Notice(log_notice_msg)
+l.Notice(log_notice_msg)
 
 log_warning_msg := "[clientip=202.106.51.6 errno=101 errmsg=\"client is error\" request_time=45ms]"
-log.Warning(log_warning_msg)
+l.Warning(log_warning_msg)
+
+//--------- 直接传递配置map调用 -----------
+
+import (
+	log "github.com/heiyeluren/xcommon/log"
+)
+
+//拼接日志文件配置选项
+logConf := map[string]string {
+    "log_notice_file_path":     "log/app.log"
+    "log_debug_file_path":      "log/app.log"
+    "log_trace_file_path":      "log/app.log"
+    "log_fatal_file_path":      "log/app.log.wf"
+    "log_warning_file_path":    "log/app.log.wf"
+    "log_cron_time":            "day"
+    "log_chan_buff_size":       "20480"
+    "log_flush_timer":          "1000"
+}
+//调用 logInit() 和 LogRun() 启动
+//初始化全局变量
+if log.GLogV == nil {
+	log.GLogV = new(log.LogT)
+}
+
+//设置配置map数据
+log.GLogV.RunConfigMap = logConf
+
+//调用初始化操作，全局只运行一次
+log.GOnceV.Do(logInit)
+
+go log.LogRun()
+
+//生成日志ID打印日志
+logid := request.Header("REQUEST_ID") //注意:自行定义REQUEST_ID这个数据，其他服务按照对应id来，这种适合链路跟踪里上层的ID
+l = log.NewLogger(logid)    //注意: 一个请求只能New一次，logid可以传空字符串，则会内部自己生成logid
+
+log_notice_msg := "[clientip=202.106.51.6 errno=0 errmsg=ok request_time=100ms]"
+l.Notice(log_notice_msg)
+
+log_warning_msg := "[clientip=202.106.51.6 errno=101 errmsg=\"client is error\" request_time=45ms]"
+l.Warning(log_warning_msg)
 
 */
 
@@ -502,9 +555,15 @@ func LogRun() {
 }
 
 func LogInit() {
+	if config == nil {
+		// panic("缺少log文件日志配置，请初始化 config 对象传入配置，或调用 logInit() 函数，通过全局变量Map方式传参")
+		panic("The log configuration of the log file is missing. Please initialize the config object to pass in the configuration, or call the logInit() function to pass parameters through the global variable map
+")
+	}	
 	RunConfigMap := config.GetSection("log")
 	if RunConfigMap == nil {
-		panic("缺少log日志配置！")
+		// panic("缺少log日志配置，请配置文件中增加 [log] section 字段配置")
+		panic("The log log configuration is missing. Please add the [log] section field configuration in the configuration file")
 	}
 	//初始化全局变量
 	if GLogV == nil {
